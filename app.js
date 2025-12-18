@@ -1,969 +1,1377 @@
-/**
- * =============================================
- * TABELA PERIÓDICA INTERATIVA - APLICAÇÃO PRINCIPAL
- * TCC - Sistemas de Informação
- * VERSÃO MODIFICADA - Sistema de Dedução
- * =============================================
- */
+/* ================================
+   RESET E CONFIGURAÇÕES GLOBAIS
+================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-// ============================================
-// VARIÁVEIS GLOBAIS
-// ============================================
-let currentElements = [];
-let currentFamily = null;
-let placedElements = 0;
-let draggedElement = null;
+:root {
+    --primary-color: #667eea;
+    --primary-dark: #5568d3;
+    --secondary-color: #764ba2;
+    --success-color: #4CAF50;
+    --error-color: #f44336;
+    --warning-color: #ffc107;
+    --text-dark: #333;
+    --text-light: #666;
+    --bg-light: #f5f5f5;
+    --white: #ffffff;
+    --shadow: 0 10px 30px rgba(0,0,0,0.3);
+    --transition: all 0.3s ease;
+}
 
-// Sistema de Pontuação
-let currentScore = 0;
-let startTime = null;
-let timerInterval = null;
-let hintsUsed = 0;
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
 
-// Persistência de Dados
-let completedElements = new Set(); // Elementos já completados permanentemente
-let completedFamilies = new Set(); // Famílias 100% completas
-let totalScore = 0;
+/* ================================
+   CONTAINER E HEADER
+================================ */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
 
-// ============================================
-// ELEMENTOS DO DOM
-// ============================================
-const DOM = {
-    selectionScreen: document.getElementById('selectionScreen'),
-    gameScreen: document.getElementById('gameScreen'),
-    familyGrid: document.getElementById('familyGrid'),
-    familyTitle: document.getElementById('familyTitle'),
-    progressBar: document.getElementById('progressBar'),
-    tableGrid: document.getElementById('tableGrid'),
-    elementsPool: document.getElementById('elementsPool'),
-    infoModal: document.getElementById('infoModal'),
-    modalTitle: document.getElementById('modalTitle'),
-    modalBody: document.getElementById('modalBody'),
-    btnReset: document.getElementById('btnReset'),
-    btnMenu: document.getElementById('btnMenu'),
-    btnCloseModal: document.getElementById('btnCloseModal'),
-    btnResetAll: document.getElementById('btnResetAll'),
-    victoryModal: document.getElementById('victoryModal'),
-    completeModal: document.getElementById('completeModal'),
-    btnContinue: document.getElementById('btnContinue'),
-    btnCompleteOk: document.getElementById('btnCompleteOk'),
-    btnViewCompleteTable: document.getElementById('btnViewCompleteTable'),
-    completeTableScreen: document.getElementById('completeTableScreen'),
-    completeTableGrid: document.getElementById('completeTableGrid'),
-    btnBackFromComplete: document.getElementById('btnBackFromComplete'),
-    btnRestartFromComplete: document.getElementById('btnRestartFromComplete'),
-    // Estatísticas
-    totalScore: document.getElementById('totalScore'),
-    totalElements: document.getElementById('totalElements'),
-    totalFamilies: document.getElementById('totalFamilies'),
-    currentScore: document.getElementById('currentScore'),
-    hintsUsed: document.getElementById('hintsUsed'),
-    timer: document.getElementById('timer')
-};
+header {
+    text-align: center;
+    color: var(--white);
+    margin-bottom: 30px;
+}
 
-// ============================================
-// INICIALIZAÇÃO
-// ============================================
-document.addEventListener('DOMContentLoaded', init);
+header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
 
-function init() {
-    console.log('🚀 Inicializando aplicação...');
-    console.log('📦 FAMILIES_DATA:', typeof FAMILIES_DATA !== 'undefined' ? 'OK' : 'ERRO');
-    console.log('📦 TABLE_STRUCTURE:', typeof TABLE_STRUCTURE !== 'undefined' ? 'OK' : 'ERRO');
-    console.log('📦 HINTS_CONFIG:', typeof HINTS_CONFIG !== 'undefined' ? 'OK' : 'ERRO');
-    
-    loadProgress();
-    renderFamilyCards();
-    setupEventListeners();
-    updateGlobalStats();
-    
-    // Verificação automática na inicialização
-    const check = checkMissingElements();
-    console.log(`Sistema carregado com ${check.total} elementos únicos`);
-    if (check.missing.length > 0) {
-        console.warn(`⚠️ Faltam ${check.missing.length} elementos:`, check.missing);
-    } else {
-        console.log('✅ Todos os 118 elementos estão cadastrados!');
+header p {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+/* ================================
+   TELAS (SCREENS)
+================================ */
+.screen {
+    display: none;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* ================================
+   TELA DE SELEÇÃO DE FAMÍLIA
+================================ */
+.family-selection {
+    background: var(--white);
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+}
+
+.family-selection h2 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    text-align: center;
+    font-size: 2em;
+}
+
+.family-selection .subtitle {
+    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 20px;
+    font-size: 1.1em;
+}
+
+/* Progresso Global */
+.global-progress {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.progress-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--white);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+    font-size: 2.5em;
+}
+
+.stat-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: var(--text-light);
+    margin-top: 3px;
+}
+
+.family-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.family-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: var(--white);
+    padding: 25px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    font-size: 1em;
+    text-align: left;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.family-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.family-card.completed {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+.family-card.completed::after {
+    content: '✓';
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 2.5em;
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+.family-card h3 {
+    margin-bottom: 8px;
+    font-size: 1.3em;
+}
+
+.family-card p {
+    font-size: 0.95em;
+    opacity: 0.95;
+    margin: 5px 0;
+}
+
+.family-card .elements-preview {
+    font-size: 0.85em;
+    margin-top: 12px;
+    opacity: 0.85;
+    font-style: italic;
+}
+
+/* ================================
+   TELA DE JOGO
+================================ */
+.game-screen {
+    background: var(--white);
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.game-title {
+    color: var(--primary-color);
+    font-size: 1.8em;
+}
+
+.game-stats {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.stat-mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-light);
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ================================
+   BOTÕES
+================================ */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: var(--transition);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-secondary {
+    background: #e0e0e0;
+    color: var(--text-dark);
+}
+
+.btn-secondary:hover {
+    background: #d0d0d0;
+    transform: translateY(-2px);
+}
+
+/* ================================
+   BARRA DE PROGRESSO
+================================ */
+.progress-bar {
+    width: 100%;
+    height: 35px;
+    background: #e0e0e0;
+    border-radius: 18px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    transition: width 0.5s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+/* ================================
+   ÁREA DO JOGO
+================================ */
+.game-area {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    margin-top: 20px;
+}
+
+/* ================================
+   TABELA PERIÓDICA
+================================ */
+.periodic-table {
+    background: var(--bg-light);
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    overflow-y: auto;
+    width: 100%;
+    max-height: 70vh;
+}
+
+.periodic-table h3 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    font-size: 1.5em;
+}
+
+.periodic-table .table-instruction {
+    font-size: 0.95em;
+    color: var(--text-light);
+    margin-bottom: 15px;
+}
+
+#tableGrid {
+    display: grid;
+    margin: 0 auto;
+    justify-content: center;
+    min-width: 1100px;
+}
+
+/* Escala responsiva para telas pequenas */
+@media (max-width: 1400px) {
+    #tableGrid {
+        transform: scale(0.85);
+        transform-origin: top left;
     }
 }
 
-function setupEventListeners() {
-    DOM.btnReset.addEventListener('click', resetGame);
-    DOM.btnMenu.addEventListener('click', backToMenu);
-    DOM.btnCloseModal.addEventListener('click', closeModal);
-    DOM.btnResetAll.addEventListener('click', resetAllProgress);
-    DOM.btnContinue.addEventListener('click', closeVictoryModal);
-    DOM.btnCompleteOk.addEventListener('click', closeCompleteModal);
-    DOM.btnViewCompleteTable.addEventListener('click', showCompleteTableView);
-    DOM.btnBackFromComplete.addEventListener('click', backToMenuFromComplete);
-    DOM.btnRestartFromComplete.addEventListener('click', restartFromComplete);
-    DOM.infoModal.addEventListener('click', (e) => {
-        if (e.target === DOM.infoModal) closeModal();
-    });
-    DOM.victoryModal.addEventListener('click', (e) => {
-        if (e.target === DOM.victoryModal) closeVictoryModal();
-    });
-}
-
-// ============================================
-// PERSISTÊNCIA DE DADOS (LocalStorage)
-// ============================================
-function loadProgress() {
-    const saved = localStorage.getItem('tabelaPeriodicaProgress');
-    if (saved) {
-        const data = JSON.parse(saved);
-        completedElements = new Set(data.completedElements || []);
-        completedFamilies = new Set(data.completedFamilies || []);
-        totalScore = data.totalScore || 0;
+@media (max-width: 1200px) {
+    #tableGrid {
+        transform: scale(0.75);
+        transform-origin: top left;
     }
 }
 
-function saveProgress() {
-    const data = {
-        completedElements: Array.from(completedElements),
-        completedFamilies: Array.from(completedFamilies),
-        totalScore: totalScore
-    };
-    localStorage.setItem('tabelaPeriodicaProgress', JSON.stringify(data));
-}
-
-function resetAllProgress() {
-    if (confirm('Tem certeza? Todo o progresso será perdido!')) {
-        localStorage.removeItem('tabelaPeriodicaProgress');
-        completedElements.clear();
-        completedFamilies.clear();
-        totalScore = 0;
-        updateGlobalStats();
-        renderFamilyCards();
-        alert('Progresso resetado com sucesso!');
+@media (max-width: 1000px) {
+    #tableGrid {
+        transform: scale(0.65);
+        transform-origin: top left;
     }
 }
 
-function updateGlobalStats() {
-    DOM.totalScore.textContent = totalScore.toLocaleString();
-    DOM.totalElements.textContent = `${completedElements.size}/118`;
-    DOM.totalFamilies.textContent = `${completedFamilies.size}/21`;
-}
-
-// ============================================
-// TIMER
-// ============================================
-function startTimer() {
-    startTime = Date.now();
-    timerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        DOM.timer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }, 1000);
-}
-
-function stopTimer() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-    }
-}
-
-function getElapsedTime() {
-    if (!startTime) return 0;
-    return Math.floor((Date.now() - startTime) / 1000);
-}
-
-function updateCurrentStats() {
-    DOM.currentScore.textContent = currentScore;
-    DOM.hintsUsed.textContent = hintsUsed;
-}
-
-function renderFamilyCards() {
-    console.log('📋 Renderizando cards de famílias...');
-    DOM.familyGrid.innerHTML = '';
-    
-    if (typeof FAMILIES_DATA === 'undefined') {
-        console.error('❌ FAMILIES_DATA não está definido!');
-        DOM.familyGrid.innerHTML = '<p style="color: red; text-align: center;">Erro: Dados não carregados. Verifique se data.js, data2.js e data3.js estão na mesma pasta.</p>';
-        return;
+@media (max-width: 800px) {
+    #tableGrid {
+        transform: scale(0.55);
+        transform-origin: top left;
     }
     
-    let cardCount = 0;
-    for (const [key, family] of Object.entries(FAMILIES_DATA)) {
-        const card = document.createElement('button');
-        card.className = 'family-card';
-        
-        // Verificar se a família está completa
-        const familyElementNumbers = family.elements.map(el => el.number);
-        const isComplete = familyElementNumbers.every(num => completedElements.has(num));
-        
-        if (isComplete) {
-            card.classList.add('completed');
-        }
-        
-        card.onclick = () => startGame(key);
-        
-        const elementsPreview = family.elements
-            .map(el => el.symbol)
-            .join(', ');
-        
-        let groupText = '';
-        if (family.group === 'Ln') {
-            groupText = 'Terras Raras';
-        } else if (family.group === 'An') {
-            groupText = 'Radioativos';
-        } else if (family.group === 'H') {
-            groupText = 'Elemento Único';
-        } else if (family.group === 'P7') {
-            groupText = 'Sintéticos';
-        } else if (family.multiGroup) {
-            groupText = 'Múltiplos Grupos';
-        } else {
-            groupText = `Grupo ${family.group}`;
-        }
-        
-        const completeIcon = isComplete ? ' ✓' : '';
-        
-        card.innerHTML = `
-            <h3>${family.icon} ${family.name}${completeIcon}</h3>
-            <p>${groupText} - ${family.elements.length} elementos</p>
-            <p class="elements-preview">${elementsPreview}</p>
-        `;
-        
-        DOM.familyGrid.appendChild(card);
-        cardCount++;
-    }
-    
-    console.log(`✅ ${cardCount} famílias renderizadas`);
-}
-
-// ============================================
-// CONTROLE DO JOGO
-// ============================================
-function startGame(familyKey) {
-    if (!FAMILIES_DATA[familyKey]) return;
-    
-    currentFamily = FAMILIES_DATA[familyKey];
-    currentElements = [...currentFamily.elements];
-    
-    // Definir título
-    let titleText = currentFamily.name;
-    if (currentFamily.group === 'Ln') {
-        titleText += ' - Lantanídeos';
-    } else if (currentFamily.group === 'An') {
-        titleText += ' - Actinídeos';
-    } else if (currentFamily.group === 'H') {
-        titleText += ' - Elemento Único';
-    } else if (currentFamily.group === 'P7') {
-        titleText += ' - Sintéticos do Período 7';
-    } else if (currentFamily.multiGroup) {
-        titleText += ' - Múltiplos Grupos';
-    } else {
-        titleText += ` - Grupo ${currentFamily.group}`;
-    }
-    
-    DOM.familyTitle.textContent = titleText;
-    
-    // Alternar telas
-    DOM.selectionScreen.classList.remove('active');
-    DOM.gameScreen.classList.add('active');
-    
-    initGame();
-}
-
-function initGame() {
-    placedElements = 0;
-    currentScore = 0;
-    hintsUsed = 0;
-    startTime = null;
-    stopTimer();
-    
-    updateProgress();
-    updateCurrentStats();
-    createTable();
-    createElementsPool();
-    
-    // Debug: verificar se elementos foram criados
-    console.log('Elementos atuais:', currentElements.length);
-    console.log('Elementos já completados:', completedElements.size);
-    console.log('Elementos para colocar:', currentElements.filter(el => !completedElements.has(el.number)).length);
-}
-
-function resetGame() {
-    if (confirm('Tem certeza que deseja reiniciar esta família?')) {
-        initGame();
-    }
-}
-
-function backToMenu() {
-    stopTimer();
-    DOM.gameScreen.classList.remove('active');
-    DOM.selectionScreen.classList.add('active');
-    updateGlobalStats();
-    renderFamilyCards();
-}
-
-// ============================================
-// CRIAÇÃO DA TABELA PERIÓDICA
-// ============================================
-function createTable() {
-    DOM.tableGrid.innerHTML = '';
-    DOM.tableGrid.style.cssText = `
-        display: grid;
-        grid-template-columns: 40px repeat(18, 55px);
-        grid-template-rows: 30px repeat(7, 55px);
-        gap: 2px;
-    `;
-    
-    // Labels dos grupos
-    createGroupLabels();
-    
-    // Labels dos períodos
-    createPeriodLabels();
-    
-    // Slots da tabela
-    createTableSlots();
-}
-
-function createGroupLabels() {
-    const header = document.createElement('div');
-    header.style.cssText = 'grid-column: 1; grid-row: 1;';
-    DOM.tableGrid.appendChild(header);
-    
-    for (let group = 1; group <= 18; group++) {
-        const label = document.createElement('div');
-        label.style.cssText = `
-            grid-column: ${group + 1};
-            grid-row: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7em;
-            font-weight: bold;
-            color: var(--primary-color);
-        `;
-        label.textContent = group;
-        DOM.tableGrid.appendChild(label);
-    }
-}
-
-function createPeriodLabels() {
-    for (let period = 1; period <= 7; period++) {
-        const label = document.createElement('div');
-        label.style.cssText = `
-            grid-column: 1;
-            grid-row: ${period + 1};
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7em;
-            font-weight: bold;
-            color: var(--primary-color);
-        `;
-        label.textContent = period;
-        DOM.tableGrid.appendChild(label);
-    }
-}
-
-function createTableSlots() {
-    if (typeof TABLE_STRUCTURE === 'undefined') {
-        console.error('❌ TABLE_STRUCTURE não está definido!');
-        return;
-    }
-    
-    TABLE_STRUCTURE.forEach((periodGroups, periodIndex) => {
-        const period = periodIndex + 1;
-        
-        periodGroups.forEach((group, groupIndex) => {
-            if (group === 0) return;
-            
-            const slot = document.createElement('div');
-            slot.className = 'element-slot';
-            slot.style.cssText = `
-                grid-column: ${groupIndex + 2};
-                grid-row: ${period + 1};
-            `;
-            
-            // Verificar se é slot ativo OU se já foi completado anteriormente
-            const element = currentElements.find(el => 
-                el.period === period && el.group === group
-            );
-            
-            // Procurar em TODAS as famílias se este elemento já foi completado
-            let completedElement = null;
-            for (const family of Object.values(FAMILIES_DATA)) {
-                const found = family.elements.find(el => 
-                    el.period === period && el.group === group && completedElements.has(el.number)
-                );
-                if (found) {
-                    completedElement = found;
-                    break;
-                }
-            }
-            
-            if (completedElement) {
-                // Elemento já completado anteriormente - mostrar permanentemente
-                slot.classList.add('filled', 'permanent');
-                slot.innerHTML = `
-                    <div class="element-display">
-                        <div class="element-number">${completedElement.number}</div>
-                        <div class="element-symbol">${completedElement.symbol}</div>
-                        <div class="element-name">${completedElement.name}</div>
-                    </div>
-                `;
-            } else if (element) {
-                // Slot ativo para a família atual
-                slot.classList.add('active');
-                slot.dataset.number = element.number;
-                slot.dataset.period = element.period;
-                slot.dataset.group = element.group;
-                
-                // NOVO: Adicionar evento de clique para mostrar dica
-                slot.addEventListener('click', () => showSlotHint(element));
-                slot.style.cursor = 'help';
-                slot.title = 'Clique para ver as características do elemento';
-                
-                slot.addEventListener('dragover', handleDragOver);
-                slot.addEventListener('drop', handleDrop);
-            } else {
-                // Slot inativo
-                slot.classList.add('inactive');
-            }
-            
-            DOM.tableGrid.appendChild(slot);
-        });
-    });
-    
-    // Adicionar slots especiais para Lantanídeos e Actinídeos se for necessário
-    if (currentFamily.group === 'Ln' || currentFamily.group === 'An' || currentFamily.group === 'P7') {
-        createLanthanideActinideSlots();
-    }
-}
-
-function createLanthanideActinideSlots() {
-    const separator = document.createElement('div');
-    separator.style.cssText = `
-        grid-column: 1 / -1;
-        height: 20px;
-    `;
-    DOM.tableGrid.appendChild(separator);
-    
-    const title = document.createElement('div');
-    title.style.cssText = `
-        grid-column: 1 / -1;
+    .periodic-table {
         padding: 10px;
+        max-height: 60vh;
+    }
+}
+
+/* ================================
+   SLOTS DOS ELEMENTOS
+================================ */
+.element-slot {
+    width: 100%;
+    height: 100%;
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fafafa;
+    transition: var(--transition);
+    font-size: 0.7em;
+    min-height: 50px;
+}
+
+.element-slot.inactive {
+    background: var(--bg-light);
+    border: 1px solid #e0e0e0;
+    opacity: 0.3;
+}
+
+.element-slot.active {
+    border: 2px dashed var(--primary-color);
+    background: #f0f0ff;
+    cursor: pointer;
+}
+
+.element-slot.active:hover {
+    background: #e8e8ff;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.element-slot.filled {
+    border: 2px solid var(--success-color);
+    background: #e8f5e9;
+}
+
+.element-slot.filled.permanent {
+    background: #c8e6c9;
+    border-color: #66bb6a;
+}
+
+.element-slot .element-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 2px;
+}
+
+.element-slot .element-display .element-number {
+    font-size: 0.7em;
+    color: var(--text-light);
+}
+
+.element-slot .element-display .element-symbol {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: var(--success-color);
+}
+
+.element-slot .element-display .element-name {
+    font-size: 0.6em;
+    color: var(--text-dark);
+    text-align: center;
+}
+
+/* ================================
+   POOL DE ELEMENTOS
+================================ */
+.elements-pool {
+    background: var(--bg-light);
+    border-radius: 10px;
+    padding: 25px;
+    width: 100%;
+}
+
+.elements-pool h3 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    text-align: center;
+    font-size: 1.4em;
+}
+
+.elements-pool .pool-instruction {
+    text-align: center;
+    font-size: 1em;
+    color: var(--text-light);
+    margin-bottom: 15px;
+}
+
+.pool-grid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+/* ================================
+   CARDS DOS ELEMENTOS
+================================ */
+.element-card {
+    background: var(--white);
+    border: 3px solid var(--primary-color);
+    border-radius: 10px;
+    padding: 18px;
+    cursor: move;
+    transition: var(--transition);
+    text-align: center;
+    min-width: 110px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+.element-card:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25);
+}
+
+.element-card.dragging {
+    opacity: 0.5;
+}
+
+.element-number {
+    font-size: 0.85em;
+    color: var(--text-light);
+}
+
+.element-symbol {
+    font-size: 2.2em;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 5px 0;
+}
+
+.element-name {
+    font-size: 1em;
+    color: var(--text-dark);
+    margin-top: 5px;
+}
+
+/* ================================
+   MODAL
+================================ */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--white);
+    border-radius: 15px;
+    padding: 35px;
+    max-width: 550px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: modalSlide 0.3s;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+
+@keyframes modalSlide {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    color: var(--primary-color);
+    font-size: 1.8em;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 2.5em;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    transition: var(--transition);
+}
+
+.close-btn:hover {
+    color: var(--text-dark);
+    transform: scale(1.1);
+}
+
+/* ================================
+   INFORMAÇÕES DO ELEMENTO
+================================ */
+.element-info {
+    line-height: 1.8;
+}
+
+.element-info p {
+    margin-bottom: 12px;
+    font-size: 1.05em;
+}
+
+.element-info strong {
+    color: var(--primary-color);
+}
+
+.element-info hr {
+    margin: 20px 0;
+    border: none;
+    border-top: 2px solid #eee;
+}
+
+/* ================================
+   CAIXA DE DICAS
+================================ */
+.hint-box {
+    background: #fff3cd;
+    border: 2px solid var(--warning-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.hint-box h4 {
+    color: #856404;
+    margin-bottom: 12px;
+    font-size: 1.3em;
+}
+
+.hint-box p {
+    margin: 8px 0;
+    font-size: 1.05em;
+}
+
+/* ================================
+   MENSAGEM DE SUCESSO
+================================ */
+.success-message {
+    background: #d4edda;
+    border: 2px solid #c3e6cb;
+    color: #155724;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.score-display {
+    display: flex;
+    justify-content: space-around;
+    margin: 25px 0;
+    padding: 20px;
+    background: var(--bg-light);
+    border-radius: 10px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.score-item {
+    text-align: center;
+    min-width: 100px;
+}
+
+.score-item .score-icon {
+    font-size: 2.5em;
+    margin-bottom: 8px;
+}
+
+.score-item .score-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.score-item .score-label {
+    font-size: 1em;
+    color: var(--text-light);
+    margin-top: 5px;
+}
+
+.stars-display {
+    font-size: 3.5em;
+    text-align: center;
+    margin: 20px 0;
+    letter-spacing: 5px;
+}
+
+.achievement-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: bold;
+    margin: 10px 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    font-size: 1.05em;
+}
+
+/* ================================
+   QUIZ
+================================ */
+.quiz-container {
+    margin: 25px 0;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid var(--primary-color);
+}
+
+.quiz-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.quiz-header h3 {
+    color: var(--primary-color);
+    font-size: 1.4em;
+    margin-bottom: 10px;
+}
+
+.quiz-question {
+    font-size: 1.15em;
+    font-weight: 500;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.quiz-option {
+    padding: 15px 20px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 1.05em;
+    text-align: left;
+}
+
+.quiz-option:hover {
+    border-color: var(--primary-color);
+    background: #f0f0ff;
+    transform: translateX(5px);
+}
+
+.quiz-option.selected {
+    border-color: var(--primary-color);
+    background: #e8e8ff;
+}
+
+.quiz-option.correct {
+    border-color: var(--success-color);
+    background: #d4edda;
+    color: #155724;
+}
+
+.quiz-option.incorrect {
+    border-color: var(--error-color);
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.quiz-option.disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.quiz-explanation {
+    margin-top: 20px;
+    padding: 15px;
+    background: #d1ecf1;
+    border-left: 4px solid #0c5460;
+    border-radius: 5px;
+    font-size: 1.05em;
+    line-height: 1.6;
+}
+
+.quiz-result {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.quiz-result.correct-answer {
+    color: var(--success-color);
+}
+
+.quiz-result.incorrect-answer {
+    color: var(--error-color);
+}
+
+.quiz-bonus {
+    display: inline-block;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-top: 10px;
+    animation: bounceIn 0.5s;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ================================
+   RESPONSIVIDADE
+================================ */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    header h1 {
+        font-size: 1.8em;
+    }
+
+    header p {
+        font-size: 1em;
+    }
+
+    .game-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .game-title {
+        font-size: 1.4em;
         text-align: center;
-        font-weight: bold;
-        color: var(--primary-color);
-        background: #f0f0ff;
-        border-radius: 5px;
-        margin: 10px 0;
-        font-size: 1.2em;
-    `;
-    title.textContent = currentFamily.name + ' - Modo Jogo';
-    DOM.tableGrid.appendChild(title);
-    
-    const specialGrid = document.createElement('div');
-    specialGrid.style.cssText = `
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: repeat(15, 60px);
-        gap: 5px;
-        justify-content: center;
-        padding: 10px;
-    `;
-    
-    currentElements.forEach((element, index) => {
-        const slot = document.createElement('div');
-        slot.className = 'element-slot';
-        slot.style.cssText = `width: 60px; height: 60px;`;
-        
-        const isCompleted = completedElements.has(element.number);
-        
-        if (isCompleted) {
-            slot.classList.add('filled', 'permanent');
-            slot.innerHTML = `
-                <div class="element-display">
-                    <div class="element-number">${element.number}</div>
-                    <div class="element-symbol">${element.symbol}</div>
-                    <div class="element-name">${element.name}</div>
-                </div>
-            `;
-        } else {
-            slot.classList.add('active');
-            slot.dataset.number = element.number;
-            slot.dataset.period = element.period;
-            slot.dataset.group = element.group;
-            
-            // NOVO: Adicionar evento de clique para mostrar dica
-            slot.addEventListener('click', () => showSlotHint(element));
-            slot.style.cursor = 'help';
-            slot.title = 'Clique para ver as características do elemento';
-            
-            slot.addEventListener('dragover', handleDragOver);
-            slot.addEventListener('drop', handleDrop);
-        }
-        
-        specialGrid.appendChild(slot);
-    });
-    
-    DOM.tableGrid.appendChild(specialGrid);
-}
-
-// ============================================
-// POOL DE ELEMENTOS
-// ============================================
-function createElementsPool() {
-    if (!DOM.elementsPool) {
-        console.error('elementsPool não encontrado!');
-        return;
     }
     
-    DOM.elementsPool.innerHTML = '';
-    
-    // Filtrar apenas elementos que ainda não foram completados
-    const elementsToPlace = currentElements.filter(el => !completedElements.has(el.number));
-    
-    console.log('Criando pool com', elementsToPlace.length, 'elementos');
-    
-    if (elementsToPlace.length === 0) {
-        // Todos os elementos desta família já foram completados
-        DOM.elementsPool.innerHTML = `
-            <p style="text-align: center; color: #4CAF50; font-weight: bold; width: 100%; padding: 20px;">
-                ✓ Todos os elementos desta família já foram completados!
-            </p>
-        `;
-        return;
+    .game-stats {
+        width: 100%;
+        justify-content: space-around;
+    }
+
+    .controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.9em;
+        flex: 1;
     }
     
-    // Embaralhar elementos
-    const shuffled = shuffleArray([...elementsToPlace]);
+    .progress-stats {
+        grid-template-columns: 1fr;
+    }
     
-    shuffled.forEach(element => {
-        const card = createElementCard(element);
-        DOM.elementsPool.appendChild(card);
-    });
+    .family-grid {
+        grid-template-columns: 1fr;
+    }
     
-    console.log('Pool criado com sucesso!');
-}
+    .periodic-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 15px;
+    }
 
-function createElementCard(element) {
-    const card = document.createElement('div');
-    card.className = 'element-card';
-    card.draggable = true;
-    card.dataset.number = element.number;
-    
-    // MODIFICADO: Mostrar símbolo E nome (SEM número atômico e massa)
-    card.innerHTML = `
-        <div class="element-symbol-large">${element.symbol}</div>
-        <div class="element-name-small">${element.name}</div>
-    `;
-    
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragend', handleDragEnd);
-    
-    return card;
-}
+    .modal-content {
+        padding: 25px;
+        max-width: 95%;
+    }
 
-// ============================================
-// SISTEMA DE DICAS (NOVO)
-// ============================================
-function showSlotHint(element) {
-    // MODIFICADO: Dicas agora são GRATUITAS para fins educativos
-    hintsUsed++;
-    updateCurrentStats();
-    
-    DOM.modalTitle.textContent = '🔍 Características do Elemento';
-    DOM.modalBody.innerHTML = `
-        <div class="hint-box">
-            <p class="hint-info">💡 Use estas informações para descobrir qual elemento colocar aqui!</p>
-            
-            <div class="hint-section">
-                <h4>📊 Informações Básicas</h4>
-                <p><strong>Número Atômico:</strong> ${element.number}</p>
-                <p><strong>Massa Atômica:</strong> ${element.mass} u</p>
-                <p><strong>Período:</strong> ${element.period}</p>
-                <p><strong>Grupo:</strong> ${element.group}</p>
-            </div>
-            
-            <div class="hint-section">
-                <h4>📝 Descrição</h4>
-                <p>${element.description}</p>
-            </div>
-            
-            <div class="hint-section">
-                <h4>⚗️ Propriedades</h4>
-                <p>${element.properties}</p>
-            </div>
-            
-            <div class="hint-section">
-                <h4>🔬 Descoberta</h4>
-                <p>${element.discovery}</p>
-            </div>
-            
-            <p class="hint-challenge">🎯 Analise as características acima e escolha o elemento correto!</p>
-            <p style="margin-top: 10px; color: #4CAF50;"><strong>📚 Dicas consultadas: ${hintsUsed}</strong></p>
-        </div>
-    `;
-    openModal();
-}
-
-// ============================================
-// DRAG AND DROP
-// ============================================
-function handleDragStart(e) {
-    draggedElement = e.target;
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
-function handleDrop(e) {
-    e.stopPropagation();
-    
-    const slot = e.currentTarget;
-    const droppedNumber = parseInt(draggedElement.dataset.number);
-    const slotNumber = parseInt(slot.dataset.number);
-    
-    if (droppedNumber === slotNumber && !slot.classList.contains('filled')) {
-        // Iniciar timer no primeiro acerto
-        if (!startTime) {
-            startTimer();
-        }
-        
-        // Acerto
-        const element = currentElements.find(el => el.number == droppedNumber);
-        slot.innerHTML = `
-            <div class="element-display">
-                <div class="element-number">${element.number}</div>
-                <div class="element-symbol">${element.symbol}</div>
-                <div class="element-name">${element.name}</div>
-            </div>
-        `;
-        slot.classList.add('filled');
-        slot.classList.remove('active');
-        slot.style.cursor = 'default';
-        slot.title = '';
-        draggedElement.remove();
-        
-        // Adicionar aos elementos completados e salvar imediatamente
-        completedElements.add(droppedNumber);
-        saveProgress(); // Salvar após cada elemento colocado
-        
-        placedElements++;
-        currentScore += 100; // MODIFICADO: +100 pontos por acerto
-        
-        updateProgress();
-        updateCurrentStats();
-        
-        console.log('Elemento', droppedNumber, 'salvo. Colocados:', placedElements, '/', currentElements.length);
-        
-        // Mostrar informações
-        showElementInfo(element);
-        
-        // Verificar conclusão - TODOS os elementos da família atual devem estar colocados
-        if (placedElements === currentElements.length) {
-            stopTimer();
-            setTimeout(showCompletionMessage, 500);
-        }
-    } else {
-        // MODIFICADO: Erro - penalidade de -10 pontos e feedback visual
-        currentScore = Math.max(0, currentScore - 10); // -10 pontos por erro
-        updateCurrentStats();
-        
-        slot.style.background = '#ffebee';
-        setTimeout(() => {
-            slot.style.background = slot.classList.contains('filled') ? '#e8f5e9' : '#f0f0ff';
-        }, 300);
+    .score-display {
+        flex-direction: column;
     }
 }
 
-// ============================================
-// PROGRESSO E FEEDBACK
-// ============================================
-function updateProgress() {
-    const percentage = (placedElements / currentElements.length) * 100;
-    DOM.progressBar.style.width = `${percentage}%`;
-    DOM.progressBar.textContent = `${placedElements} / ${currentElements.length}`;
-}
-
-// ============================================
-// MODAIS E MENSAGENS
-// ============================================
-function showElementInfo(element) {
-    DOM.modalTitle.textContent = `${element.symbol} - ${element.name}`;
-    DOM.modalBody.innerHTML = `
-        <div class="element-info-correct">
-            <p class="correct-badge">✅ Correto! +100 pontos</p>
-            <p><strong>Número Atômico:</strong> ${element.number}</p>
-            <p><strong>Massa Atômica:</strong> ${element.mass} u</p>
-            <p><strong>Período:</strong> ${element.period}</p>
-            <p><strong>Grupo:</strong> ${element.group}</p>
-            <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
-            <p><strong>Descrição:</strong> ${element.description}</p>
-            <p><strong>Propriedades:</strong> ${element.properties}</p>
-            <p><strong>Descoberta:</strong> ${element.discovery}</p>
-        </div>
-    `;
-    openModal();
-}
-
-function showCompletionMessage() {
-    const timeElapsed = getElapsedTime();
-    
-    // Atualizar pontuação global
-    totalScore += currentScore;
-    
-    // Verificar se a família foi 100% completada
-    const familyElementNumbers = currentFamily.elements.map(el => el.number);
-    const isFamilyComplete = familyElementNumbers.every(num => completedElements.has(num));
-    
-    if (isFamilyComplete && !completedFamilies.has(currentFamily.name)) {
-        completedFamilies.add(currentFamily.name);
+@media (max-width: 480px) {
+    .stat-mini {
+        font-size: 1em;
+        padding: 8px 12px;
     }
-    
-    // Salvar progresso
-    saveProgress();
-    
-    // VERIFICAR SE COMPLETOU TODA A TABELA (118 elementos)
-    if (completedElements.size === 118) {
-        showFullTableCompletionMessage();
-        return;
-    }
-    
-    // Atualizar modal de vitória
-    document.getElementById('finalScore').textContent = currentScore;
-    document.getElementById('finalTime').textContent = formatTime(timeElapsed);
-    document.getElementById('finalHints').textContent = hintsUsed;
-    
-    // Abrir modal de vitória
-    DOM.victoryModal.classList.add('active');
-}
 
-function showFullTableCompletionMessage() {
-    document.getElementById('completeTotalScore').textContent = totalScore.toLocaleString();
-    document.getElementById('completeTableScore').textContent = totalScore.toLocaleString() + ' Pontos';
-    DOM.completeModal.classList.add('active');
-}
+    .element-card {
+        min-width: 90px;
+        padding: 15px;
+    }
 
-function showCompleteTableView() {
-    // Fechar modal
-    DOM.completeModal.classList.remove('active');
-    
-    // Esconder outras telas
-    DOM.selectionScreen.classList.remove('active');
-    DOM.gameScreen.classList.remove('active');
-    
-    // Mostrar tela de tabela completa
-    DOM.completeTableScreen.classList.add('active');
-    
-    // Renderizar a tabela completa
-    renderCompletePeriodicTable();
-}
-
-function renderCompletePeriodicTable() {
-    DOM.completeTableGrid.innerHTML = '';
-    
-    // Criar todos os 118 elementos organizados na estrutura da tabela
-    const allElementsMap = new Map();
-    
-    // Mapear todos os elementos por número atômico
-    for (const family of Object.values(FAMILIES_DATA)) {
-        family.elements.forEach(el => {
-            allElementsMap.set(el.number, el);
-        });
-    }
-    
-    // Estrutura da tabela periódica completa (10 linhas incluindo lantanídeos e actinídeos)
-    // Linhas 1-7: Tabela principal
-    for (let row = 1; row <= 7; row++) {
-        for (let col = 1; col <= 18; col++) {
-            const slot = document.createElement('div');
-            slot.className = 'element-slot';
-            slot.style.cssText = `grid-column: ${col}; grid-row: ${row};`;
-            
-            // Encontrar elemento nesta posição
-            let element = null;
-            for (const el of allElementsMap.values()) {
-                if (el.period === row && el.group === col) {
-                    element = el;
-                    break;
-                }
-            }
-            
-            if (element) {
-                slot.classList.add('filled');
-                // Adicionar classe de grupo para cores
-                if (element.group <= 2) {
-                    slot.classList.add(`group-${element.group}`);
-                } else if (element.group >= 13) {
-                    slot.classList.add(`group-${element.group}`);
-                } else {
-                    slot.classList.add('transition-metal');
-                }
-                
-                slot.innerHTML = `
-                    <div class="element-number">${element.number}</div>
-                    <div class="element-symbol">${element.symbol}</div>
-                    <div class="element-name">${element.name}</div>
-                `;
-                
-                // Adicionar tooltip com informações
-                slot.title = `${element.name} (${element.symbol}) - Z=${element.number}`;
-            }
-            
-            DOM.completeTableGrid.appendChild(slot);
-        }
-    }
-    
-    // Linha 8: Espaço vazio
-    for (let col = 1; col <= 18; col++) {
-        const empty = document.createElement('div');
-        empty.style.cssText = `grid-column: ${col}; grid-row: 8;`;
-        DOM.completeTableGrid.appendChild(empty);
-    }
-    
-    // Linha 9: Lantanídeos (57-71)
-    for (let i = 57; i <= 71; i++) {
-        const element = allElementsMap.get(i);
-        if (element) {
-            const slot = document.createElement('div');
-            slot.className = 'element-slot filled lanthanide';
-            const col = i - 57 + 2; // Começar na coluna 2
-            slot.style.cssText = `grid-column: ${col}; grid-row: 9;`;
-            slot.innerHTML = `
-                <div class="element-number">${element.number}</div>
-                <div class="element-symbol">${element.symbol}</div>
-                <div class="element-name">${element.name}</div>
-            `;
-            slot.title = `${element.name} (${element.symbol}) - Z=${element.number} - Lantanídeo`;
-            DOM.completeTableGrid.appendChild(slot);
-        }
-    }
-    
-    // Linha 10: Actinídeos (89-103)
-    for (let i = 89; i <= 103; i++) {
-        const element = allElementsMap.get(i);
-        if (element) {
-            const slot = document.createElement('div');
-            slot.className = 'element-slot filled actinide';
-            const col = i - 89 + 2; // Começar na coluna 2
-            slot.style.cssText = `grid-column: ${col}; grid-row: 10;`;
-            slot.innerHTML = `
-                <div class="element-number">${element.number}</div>
-                <div class="element-symbol">${element.symbol}</div>
-                <div class="element-name">${element.name}</div>
-            `;
-            slot.title = `${element.name} (${element.symbol}) - Z=${element.number} - Actinídeo`;
-            DOM.completeTableGrid.appendChild(slot);
-        }
-    }
-    
-    // Adicionar labels para lantanídeos e actinídeos
-    const lnLabel = document.createElement('div');
-    lnLabel.style.cssText = `grid-column: 1; grid-row: 9; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--primary-color); font-size: 0.8em;`;
-    lnLabel.textContent = 'Ln';
-    DOM.completeTableGrid.appendChild(lnLabel);
-    
-    const anLabel = document.createElement('div');
-    anLabel.style.cssText = `grid-column: 1; grid-row: 10; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--primary-color); font-size: 0.8em;`;
-    anLabel.textContent = 'An';
-    DOM.completeTableGrid.appendChild(anLabel);
-}
-
-function backToMenuFromComplete() {
-    DOM.completeTableScreen.classList.remove('active');
-    DOM.selectionScreen.classList.add('active');
-}
-
-function restartFromComplete() {
-    if (confirm('Tem certeza que deseja começar uma nova jornada? Todo o progresso será perdido!')) {
-        localStorage.removeItem('tabelaPeriodicaProgress');
-        completedElements.clear();
-        completedFamilies.clear();
-        totalScore = 0;
-        DOM.completeTableScreen.classList.remove('active');
-        DOM.selectionScreen.classList.add('active');
-        updateGlobalStats();
-        renderFamilyCards();
+    .element-symbol {
+        font-size: 1.8em;
     }
 }
 
-function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function openModal() {
-    DOM.infoModal.classList.add('active');
-}
-
-function closeModal() {
-    DOM.infoModal.classList.remove('active');
-}
-
-function closeVictoryModal() {
-    DOM.victoryModal.classList.remove('active');
-    backToMenu();
-}
-
-function closeCompleteModal() {
-    DOM.completeModal.classList.remove('active');
-    DOM.selectionScreen.classList.add('active');
-    updateGlobalStats();
-    renderFamilyCards();
-}
-
-// ============================================
-// UTILITÁRIOS
-// ============================================
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+/* Animação de pontuação */
+@keyframes scoreUp {
+    0% {
+        transform: scale(1);
     }
-    return array;
+    50% {
+        transform: scale(1.2);
+        color: #4CAF50;
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
-// Função para verificar elementos faltantes
-function checkMissingElements() {
-    const allElements = new Set();
-    for (const family of Object.values(FAMILIES_DATA)) {
-        family.elements.forEach(el => allElements.add(el.number));
+.stat-mini.score-animation {
+    animation: scoreUp 0.3s ease;
+   }
+
+/* ============================================
+   NOVOS ESTILOS - SISTEMA DE DEDUÇÃO
+   ============================================ */
+
+/* Elemento card - símbolo e nome */
+.element-symbol-only {
+    font-size: 3em;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: center;
+    padding: 20px;
+}
+
+.element-symbol-large {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 5px;
+}
+
+.element-name-small {
+    font-size: 0.95em;
+    color: #666;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Hint Box */
+.hint-box {
+    text-align: left;
+}
+
+.hint-warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.hint-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.hint-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.hint-section h4 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.hint-section p {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.hint-challenge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    margin-top: 20px;
+}
+
+/* Elemento info correto */
+.element-info-correct {
+    text-align: left;
+}
+
+.correct-badge {
+    background: #d4edda;
+    color: #155724;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+}
+
+/* Modal de Vitória */
+.victory-content {
+    max-width: 600px;
+}
+
+.victory-body {
+    padding: 20px;
+}
+
+.victory-stats {
+    display: flex;
+    justify-content: space-around;
+    margin: 30px 0;
+    gap: 20px;
+}
+
+.victory-stat {
+    text-align: center;
+    flex: 1;
+}
+
+.victory-stat .stat-icon {
+    font-size: 3em;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.victory-stat .stat-label {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.victory-stat .stat-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.btn-large {
+    padding: 15px 40px;
+    font-size: 1.2em;
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Modal Footer */
+.modal-footer {
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+
+.hint-cost {
+    color: #856404;
+    background: #fff3cd;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 0.95em;
+}
+
+.hint-free {
+    color: #155724;
+    background: #d4edda;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 0.95em;
+    font-weight: 600;
+}
+
+/* Slot com cursor de ajuda */
+.element-slot.active {
+    cursor: help;
+}
+
+.element-slot.active:hover::after {
+    content: '💡 Clique para dica';
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.7em;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Família completa */
+.family-card.completed {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-color: #28a745;
+}
+
+.family-card.completed h3::after {
+    content: ' ✓';
+    color: #28a745;
+}
+
+/* Animações */
+@keyframes hintPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 20px 10px rgba(102, 126, 234, 0);
+    }
+}
+
+.element-slot.active:hover {
+    animation: hintPulse 2s infinite;
+}
+
+/* Responsividade para novos elementos */
+@media (max-width: 768px) {
+    .victory-stats {
+        flex-direction: column;
     }
     
-    const elementsArray = Array.from(allElements).sort((a, b) => a - b);
-    
-    const missing = [];
-    for (let i = 1; i <= 118; i++) {
-        if (!allElements.has(i)) {
-            missing.push(i);
-        }
+    .hint-section {
+        padding: 12px;
     }
     
-    console.log('═══════════════════════════════════════');
-    console.log('📊 VERIFICAÇÃO DA TABELA PERIÓDICA');
-    console.log('═══════════════════════════════════════');
-    console.log('Total de elementos únicos:', allElements.size);
-    console.log('Elementos cadastrados:', elementsArray);
-    
-    if (missing.length > 0) {
-        console.warn('⚠️ ELEMENTOS FALTANDO:', missing);
-        console.log('Faltam', missing.length, 'elementos para completar os 118');
-    } else {
-        console.log('✅ Todos os 118 elementos estão cadastrados!');
+    .element-symbol-only {
+        font-size: 2.5em;
+        padding: 15px;
     }
-    console.log('═══════════════════════════════════════');
+}
+
+/* ============================================
+   TELA DE TABELA COMPLETA
+   ============================================ */
+
+.complete-table-view {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.complete-header {
+    text-align: center;
+    margin-bottom: 30px;
+    animation: slideDown 0.8s ease-out;
+}
+
+.complete-header h1 {
+    font-size: 3em;
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+}
+
+.complete-subtitle {
+    font-size: 1.3em;
+    color: var(--text-color);
+    margin-top: 10px;
+}
+
+.complete-stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.1));
+    border-radius: 15px;
+    border: 2px solid #FFD700;
+    animation: fadeIn 1s ease-out 0.3s both;
+}
+
+.complete-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+.complete-stat .stat-icon {
+    font-size: 1.5em;
+}
+
+.complete-table-container {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+    overflow-x: auto;
+    animation: fadeIn 1s ease-out 0.5s both;
+}
+
+#completeTableGrid {
+    display: grid;
+    grid-template-columns: repeat(18, 60px);
+    grid-template-rows: repeat(10, 60px);
+    gap: 3px;
+    justify-content: center;
+    min-width: fit-content;
+}
+
+.complete-table-container .element-slot {
+    width: 60px;
+    height: 60px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75em;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.complete-table-container .element-slot:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+.complete-table-container .element-slot.filled {
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+    border-color: #4CAF50;
+}
+
+.complete-table-container .element-number {
+    font-size: 0.7em;
+    color: #666;
+}
+
+.complete-table-container .element-symbol {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 2px 0;
+}
+
+.complete-table-container .element-name {
+    font-size: 0.65em;
+    color: #666;
+    text-align: center;
+    line-height: 1;
+}
+
+.complete-actions {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    animation: fadeIn 1s ease-out 0.7s both;
+}
+
+/* Cores específicas por grupo na tabela completa */
+.complete-table-container .group-1 { background: linear-gradient(135deg, #ffebee, #ffcdd2); }
+.complete-table-container .group-2 { background: linear-gradient(135deg, #fff3e0, #ffe0b2); }
+.complete-table-container .group-13 { background: linear-gradient(135deg, #e3f2fd, #bbdefb); }
+.complete-table-container .group-14 { background: linear-gradient(135deg, #f3e5f5, #e1bee7); }
+.complete-table-container .group-15 { background: linear-gradient(135deg, #e8eaf6, #c5cae9); }
+.complete-table-container .group-16 { background: linear-gradient(135deg, #fce4ec, #f8bbd0); }
+.complete-table-container .group-17 { background: linear-gradient(135deg, #fff9c4, #fff59d); }
+.complete-table-container .group-18 { background: linear-gradient(135deg, #e0f2f1, #b2dfdb); }
+.complete-table-container .transition-metal { background: linear-gradient(135deg, #fff8e1, #ffecb3); }
+.complete-table-container .lanthanide { background: linear-gradient(135deg, #ede7f6, #d1c4e9); }
+.complete-table-container .actinide { background: linear-gradient(135deg, #fce4ec, #f8bbd0); }
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsividade para tabela completa */
+@media (max-width: 1200px) {
+    #completeTableGrid {
+        grid-template-columns: repeat(18, 50px);
+        grid-template-rows: repeat(10, 50px);
+    }
     
-    return {
-        total: allElements.size,
-        elements: elementsArray,
-        missing: missing
-    };
-      }
+    .complete-table-container .element-slot {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+@media (max-width: 768px) {
+    .complete-header h1 {
+        font-size: 2em;
+    }
+    
+    .complete-stats-bar {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    #completeTableGrid {
+        grid-template-columns: repeat(18, 40px);
+        grid-template-rows: repeat(10, 40px);
+        gap: 2px;
+    }
+    
+    .complete-table-container .element-slot {
+        width: 40px;
+        height: 40px;
+        font-size: 0.6em;
+    }
+    
+    .complete-actions {
+        flex-direction: column;
+    }
+    
+    .btn-large {
+        width: 100%;
+    }
+}
+
+/* Animação de entrada dos elementos da tabela completa */
+.complete-table-container .element-slot {
+    animation: elementPop 0.5s ease-out backwards;
+}
+
+.complete-table-container .element-slot:nth-child(1) { animation-delay: 0.05s; }
+.complete-table-container .element-slot:nth-child(2) { animation-delay: 0.1s; }
+.complete-table-container .element-slot:nth-child(3) { animation-delay: 0.15s; }
+
+@keyframes elementPop {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Efeito de brilho dourado ao passar o mouse */
+.complete-table-container .element-slot:hover {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    border-color: #FFD700;
+}
