@@ -1,3 +1,4 @@
+
 /* ================================
    RESET E CONFIGURAÇÕES GLOBAIS
 ================================ */
@@ -1374,4 +1375,4 @@ header p {
 .complete-table-container .element-slot:hover {
     box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
     border-color: #FFD700;
-  }
+       }
